@@ -5,7 +5,7 @@ from scipy import stats
 import numpy as np
 import os
 
-graphics_folder = 'graphics2'
+graphics_folder = 'graphics3'
 if not os.path.exists(graphics_folder):
     os.makedirs(graphics_folder)
     print(f"Pasta '{graphics_folder}' criada com sucesso.")
@@ -55,7 +55,6 @@ colunas_uso_internet = [
     'usa_internet_download'
 ]
 for col in colunas_uso_internet:
-    # verifica se a coluna existe antes
     if col in df.columns:
         df[col] = df[col].map(sim_nao_map)
 
@@ -282,5 +281,240 @@ if 'sexo' in df.columns and 'tempo_conectado_diario' in df.columns:
     else:
         print("\n--- Teste de Comparação de Grupos (Mann-Whitney U) ---")
         print("Teste de comparação do tempo conectado entre sexos não pôde ser realizado por falta de dados em um dos grupos.")
+
+
+device_order = ['Celular', 'Computador/Notebook', 'Tablet']
+
+
+plt.figure(figsize=(12, 7))
+if 'dispositivo_mais_acessado' in df.columns and 'renda_familiar' in df.columns:
+    sns.boxplot(
+        x='dispositivo_mais_acessado',
+        y='renda_familiar',
+        data=df,
+        palette='viridis',
+        order=device_order
+    )
+    plt.title('Distribuição da Renda Familiar por Dispositivo Principal', fontsize=16)
+    plt.xlabel('Dispositivo Principal', fontsize=12)
+    plt.ylabel('Renda Familiar (R$)', fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(graphics_folder, '16_boxplot_renda_dispositivo.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+if all(col in df.columns for col in ['dispositivo_mais_acessado', 'renda_familiar', 'periodo', 'trabalha']):
+    g = sns.catplot(
+        data=df,
+        x='dispositivo_mais_acessado',
+        y='renda_familiar',
+        col='periodo',
+        row='trabalha',
+        kind='box',
+        palette='plasma',
+        height=5,
+        aspect=1.2,
+        order=device_order,
+        sharey=True
+    )
+    g.fig.suptitle('Renda vs. Dispositivo por Período de Estudo e Situação de Trabalho', y=1.03, fontsize=16)
+    g.set_axis_labels('Dispositivo Principal', 'Renda Familiar (R$)')
+    g.set_titles(col_template="{col_name}", row_template="{row_name}")
+    g.savefig(os.path.join(graphics_folder, '17_catplot_renda_dispositivo_trabalho_periodo.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+plt.figure(figsize=(12, 7))
+if 'semestre_que_est_cursando' in df.columns and 'tempo_estudo_internet' in df.columns:
+    sns.boxplot(x='semestre_que_est_cursando', y='tempo_estudo_internet', data=df, palette='magma')
+    plt.title('Distribuição do Tempo de Estudo na Internet por Semestre', fontsize=16)
+    plt.xlabel('Semestre', fontsize=12)
+    plt.ylabel('Horas de Estudo na Internet', fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(graphics_folder, '18_boxplot_estudo_semestre.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+if 'semestre_que_est_cursando' in df.columns:
+    bins_semestre = [0, 3, 7, 10]
+    labels_semestre = ['Iniciante (1-3)', 'Intermediário (4-7)', 'Finalista (8-10)']
+    df['faixa_semestre'] = pd.cut(df['semestre_que_est_cursando'], bins=bins_semestre, labels=labels_semestre, right=True)
+
+if 'renda_familiar' in df.columns:
+    bins_renda = [0, 3000, 6000, np.inf]
+    labels_renda = ['Baixa (até R$3k)', 'Média (R$3k-R$6k)', 'Alta (> R$6k)']
+    df['faixa_renda'] = pd.cut(df['renda_familiar'], bins=bins_renda, labels=labels_renda, right=False)
+
+if 'faixa_semestre' in df.columns:
+    finalidades_semestre = [col for col in ['usa_internet_pesquisa', 'usa_internet_videos', 'usa_internet_jogos', 'usa_internet_trabalho'] if col in df.columns]
+    if finalidades_semestre:
+        df_finalidades_semestre = df.groupby('faixa_semestre')[finalidades_semestre].apply(lambda x: x.eq('Sim').mean()).unstack().reset_index()
+        df_finalidades_semestre.columns = ['Faixa de Semestre', 'Finalidade', 'Proporção']
+        df_finalidades_semestre['Finalidade'] = df_finalidades_semestre['Finalidade'].str.replace('usa_internet_', '').str.capitalize()
+
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x='Faixa de Semestre', y='Proporção', hue='Finalidade', data=df_finalidades_semestre, palette='crest')
+        plt.title('Proporção de Finalidades de Uso da Internet por Faixa de Semestre', fontsize=16)
+        plt.xlabel('Faixa de Semestre', fontsize=12)
+        plt.ylabel('Proporção de Estudantes (%)', fontsize=12)
+        plt.legend(title='Finalidade')
+        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
+        plt.tight_layout()
+        plt.savefig(os.path.join(graphics_folder, '19_barplot_finalidade_semestre.png'), dpi=300, bbox_inches='tight')
+        plt.show()
+        plt.close()
+
+if 'faixa_renda' in df.columns:
+    finalidades_renda = [col for col in ['usa_internet_pesquisa', 'usa_internet_trabalho', 'usa_internet_compras', 'usa_internet_jogos'] if col in df.columns]
+    if finalidades_renda:
+        df_finalidades_renda = df.groupby('faixa_renda')[finalidades_renda].apply(lambda x: x.eq('Sim').mean()).unstack().reset_index()
+        df_finalidades_renda.columns = ['Faixa de Renda', 'Finalidade', 'Proporção']
+        df_finalidades_renda['Finalidade'] = df_finalidades_renda['Finalidade'].str.replace('usa_internet_', '').str.capitalize()
+
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x='Faixa de Renda', y='Proporção', hue='Finalidade', data=df_finalidades_renda, palette='flare')
+        plt.title('Proporção de Finalidades de Uso da Internet por Faixa de Renda', fontsize=16)
+        plt.xlabel('Faixa de Renda Familiar', fontsize=12)
+        plt.ylabel('Proporção de Estudantes (%)', fontsize=12)
+        plt.legend(title='Finalidade')
+        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
+        plt.tight_layout()
+        plt.savefig(os.path.join(graphics_folder, '20_barplot_finalidade_renda.png'), dpi=300, bbox_inches='tight')
+        plt.show()
+        plt.close()
+
+plt.figure(figsize=(10, 7))
+if 'redes_sociais_ambiente_toxico' in df.columns and 'tempo_conectado_diario' in df.columns:
+    sns.boxplot(x='redes_sociais_ambiente_toxico', y='tempo_conectado_diario', data=df, palette='coolwarm')
+    plt.title('Tempo Conectado vs. Percepção de Toxicidade nas Redes Sociais', fontsize=16)
+    plt.xlabel('Considera as Redes Sociais um Ambiente Tóxico?', fontsize=12)
+    plt.ylabel('Horas Conectado Diariamente', fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(graphics_folder, '21_boxplot_tempo_toxicidade.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+if 'o_que_o_computador_representa_para_voce' in df.columns:
+    plt.figure(figsize=(12, 8))
+    sns.countplot(y='o_que_o_computador_representa_para_voce', data=df, hue='o_que_o_computador_representa_para_voce',
+                  palette='crest', order=df['o_que_o_computador_representa_para_voce'].value_counts().index, legend=False)
+    plt.title('O Que o Computador Representa para os Estudantes', fontsize=16)
+    plt.xlabel('Quantidade de Estudantes')
+    plt.ylabel('Representação')
+    plt.savefig(os.path.join(graphics_folder, '22_barras_representacao_pc.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+
+if 'semestre_que_est_cursando' in df.columns:
+    plt.figure(figsize=(12, 7))
+    order_semestre = sorted(df['semestre_que_est_cursando'].dropna().unique())
+    sns.countplot(x='semestre_que_est_cursando', data=df, palette='rocket', order=order_semestre)
+    plt.title('Distribuição de Estudantes por Semestre', fontsize=16)
+    plt.xlabel('Semestre')
+    plt.ylabel('Quantidade de Estudantes')
+    plt.savefig(os.path.join(graphics_folder, '23_barras_semestre.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+
+if 'h_quanto_tempo_utiliza_computador' in df.columns:
+    plt.figure(figsize=(12, 7))
+    sns.countplot(y='h_quanto_tempo_utiliza_computador', data=df, hue='h_quanto_tempo_utiliza_computador',
+                  palette='mako', order=df['h_quanto_tempo_utiliza_computador'].value_counts().index, legend=False)
+    plt.title('Tempo de Uso de Computador', fontsize=16)
+    plt.xlabel('Quantidade de Estudantes')
+    plt.ylabel('Tempo de Uso')
+    plt.savefig(os.path.join(graphics_folder, '24_barras_tempo_uso_pc.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+if 'voce_costuma_acessar_a_internet' in df.columns and df['voce_costuma_acessar_a_internet'].notna().any():
+    plt.figure(figsize=(10, 8))
+    df['voce_costuma_acessar_a_internet'].value_counts().plot.pie(autopct='%1.1f%%', startangle=90,
+                                                                 colors=['#66c2a5','#fc8d62'], textprops={'fontsize': 14})
+    plt.title('Proporção de Estudantes que Acessam a Internet Regularmente', fontsize=16)
+    plt.ylabel('')
+    plt.savefig(os.path.join(graphics_folder, '25_pizza_acessa_internet.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+
+
+print("\n--- Gerando gráficos simples para perguntas básicas ---")
+
+if 'sexo' in df.columns:
+    plt.figure(figsize=(8, 8))
+    df['sexo'].value_counts().plot.pie(
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=['#66b3ff','#ff9999'],
+        wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+    )
+    plt.title('Distribuição por Sexo', fontsize=16)
+    plt.ylabel('') 
+    plt.savefig(os.path.join(graphics_folder, '26_pizza_sexo.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Gráfico 26 (Pizza Sexo) gerado.")
+
+if 'periodo' in df.columns:
+    plt.figure(figsize=(10, 6))
+    sns.countplot(data=df, x='periodo', hue='periodo', palette='coolwarm', legend=False)
+    plt.title('Distribuição de Estudantes por Período', fontsize=16)
+    plt.xlabel('Período de Estudo', fontsize=12)
+    plt.ylabel('Quantidade de Estudantes', fontsize=12)
+    plt.savefig(os.path.join(graphics_folder, '27_barras_periodo.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Gráfico 27 (Barras Período) gerado.")
+
+if 'trabalha' in df.columns:
+    plt.figure(figsize=(8, 8))
+    df['trabalha'].value_counts().plot.pie(
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=['#ffcc99','#99ff99'],
+        wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+    )
+    plt.title('Proporção de Estudantes que Trabalham', fontsize=16)
+    plt.ylabel('')
+    plt.savefig(os.path.join(graphics_folder, '28_pizza_trabalha.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Gráfico 28 (Pizza Trabalha) gerado.")
+
+if 'internet_atrapalha_formacao' in df.columns:
+    plt.figure(figsize=(8, 8))
+    df['internet_atrapalha_formacao'].value_counts().plot.pie(
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=['#c2c2f0','#ffb3e6'],
+        wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+    )
+    plt.title('Percepção: A Internet Atrapalha a Formação?', fontsize=16)
+    plt.ylabel('')
+    plt.savefig(os.path.join(graphics_folder, '29_pizza_internet_atrapalha.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Gráfico 29 (Pizza Internet Atrapalha) gerado.")
+
+
+if 'redes_sociais_ambiente_toxico' in df.columns:
+    plt.figure(figsize=(8, 8))
+    df['redes_sociais_ambiente_toxico'].value_counts().plot.pie(
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=['#ff6666','#ffb366'],
+        wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+    )
+    plt.title('Percepção: Redes Sociais são um Ambiente Tóxico?', fontsize=16)
+    plt.ylabel('')
+    plt.savefig(os.path.join(graphics_folder, '30_pizza_redes_toxicas.png'), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Gráfico 30 (Pizza Redes Tóxicas) gerado.")
 
 print("\n\nAnálise finalizada. Gráficos salvos na pasta 'graphics'.")
